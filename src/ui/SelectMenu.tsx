@@ -5,7 +5,7 @@ import { category } from '../data'
 import { ICategory } from '../interfaces'
 
 interface IProps {
-  selected : ICategory,
+  selected : {name:string, imgURL:string},
   setSelected: (category : ICategory) => void
 }
 
@@ -21,7 +21,7 @@ const SelectMenu = ({selected, setSelected} : IProps) => {
           </span>
           <ChevronUpDownIcon
             aria-hidden="true"
-            className="col-start-1 row-start-1 size-5 self-center justify-self-end text-gray-500 sm:size-4"
+            className="col-start-1 row-start-1 size-5 self-center justify-self-end text-gray-500 sm:size-4 cursor-pointer"
           />
         </ListboxButton>
 

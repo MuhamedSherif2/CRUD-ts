@@ -1,10 +1,11 @@
-import { ChangeEvent, FormEvent, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import './App.css'
 
 import { category, colors, formInputList, productList } from './data';
 import { IProduct } from './interfaces';
 import { productValidation } from './validation';
 import { ProductType } from './type';
+import { v4 as uuidv4 } from 'uuid';
 
 import Button from './ui/Button'
 import Input from './ui/Input';
@@ -34,30 +35,49 @@ function App() {
   const [editProductIdx, setEditProductEdx] = useState<number>(0)
   const [isOpen, setIsOpen] = useState(false)
   const [isOpenEdit, setIsOpenEdit] = useState(false)
+  const [isOpenRemove, setIsOpenRemove] = useState(false)
   const [errorMessage, setErrorMessage] = useState({
     title: '', descrption: '', imageURL: '', price: ''
   })
   const [tempColor, setTempColor] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState(category[0])
-
+  useEffect(() => {
+    const savedProducts = localStorage.getItem('products');
+    if (savedProducts) {
+      setProducts(JSON.parse(savedProducts));
+    } else {
+      setProducts(productList);
+    }
+  }, []);
 
   const open = () => setIsOpen(true)
   const close = () => setIsOpen(false)
   const openEdit = () => setIsOpenEdit(true)
   const closeEdit = () => setIsOpenEdit(false)
+  const openRemoveForm = () => setIsOpenRemove(true)
+  const closeRemoveForm = () => setIsOpenRemove(false)
+
   const handlerAdd = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setProduct({ ...product, [name]: value, })
     setErrorMessage({ ...errorMessage, [name]: '' })
   }
+
   const handlerEdit = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEditProduct({ ...editProduct, [name]: value, })
     setErrorMessage({ ...errorMessage, [name]: '' })
   }
+
   const onCancel = () => {
     setProduct(defaultProduct)
     close()
+  }
+
+  const removeProduct = () => {
+    const filterProduct = products.filter(product => product.id !== editProduct.id)
+    setProducts(filterProduct)
+    closeRemoveForm()
   }
 
   const onSubmit = (e: FormEvent<HTMLFormElement>): void => {
@@ -70,11 +90,18 @@ function App() {
       price,
     });
     const errMessage = Object.values(errors).some(value => value === '') && Object.values(errors).every(value => value === '')
+
     if (!errMessage) {
       setErrorMessage(errors)
       return;
     }
-    setProducts(prev => [{ ...product, id: '', colors: tempColor, category: selectedCategory }, ...prev])
+    const newProduct = { ...product, id: uuidv4(), colors: tempColor, category: selectedCategory }
+
+    setProducts((prev) => {
+      const updateProducts = [newProduct, ...prev]
+      localStorage.setItem('products', JSON.stringify(updateProducts));
+      return updateProducts;
+    })
     setProduct(defaultProduct)
     setTempColor([])
     close()
@@ -96,9 +123,14 @@ function App() {
       return;
     }
 
-    const updatedProduct = [...products]
-    updatedProduct[editProductIdx] = editProduct
-    setProducts(updatedProduct)
+    setProducts(prev => {
+      const updatedProducts = [...prev];
+      updatedProducts[editProductIdx] = {
+        ...editProduct, colors: [...tempColor, ...editProduct.colors]
+      };
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
+      return updatedProducts;
+    });
 
     setEditProduct(defaultProduct)
     setTempColor([])
@@ -112,6 +144,7 @@ function App() {
     openEdit={openEdit}
     idx={idx}
     setEditProductEdx={setEditProductEdx}
+    openRemoveForm={openRemoveForm}
   />)
 
   const formInput = formInputList.map((input) => (
@@ -122,14 +155,20 @@ function App() {
     </div>
   ))
 
-  const renderColorPro = colors.map(color => <CircleColor key={color} color={color} onClick={() => {
-    if (tempColor.includes(color)) {
-      setTempColor(prev => prev.filter(item => item !== color))
-      return;
-    }
-    setTempColor((prev) => [...prev, color])
-  }}
-  />)
+  const renderColorPro = colors.map(color =>
+    <CircleColor key={color} color={color} onClick={() => {
+      if (tempColor.includes(color)) {
+        setTempColor(prev => prev.filter(item => item !== color))
+        return;
+      }
+      if (editProduct.colors.includes(color)) {
+        setTempColor(prev => prev.filter(item => item !== color))
+        return;
+      }
+      setTempColor((prev) => [...prev, color])
+    }}
+    />
+  )
 
   const renderEditProduct = (id: string, label: string, name: ProductType) => {
     return (
@@ -142,10 +181,10 @@ function App() {
   }
 
   return (
-    <main className='container mx-auto'>
-      <Button onClick={open}>Open</Button>
+    <main className='container mx-auto pt-5'>
+      <Button onClick={open} className='mb-5 bg-indigo-500 w-[150px]'>Add Product</Button>
 
-      <div className='grid grid-cols-1 md:grid-cols-2'>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lgl:grid-cols-3 xl:grid-cols-4 gap-5'>
         {renderProduct}
       </div>
       {/* Open new product */}
@@ -162,8 +201,8 @@ function App() {
             ))}
           </div>
           <div className='flex flex-row gap-x-3 w-full'>
-            <Button className='bg-indigo-500 text-[20px] font-semibold transition duration-300 hover:bg-indigo-800'>Submit</Button>
-            <Button className='bg-white text-[20px] font-semibold' onClick={onCancel}>Cancel</Button>
+            <Button className='bg-indigo-600  hover:bg-indigo-500'>Submit</Button>
+            <Button className='bg-gray-500  hover:bg-gray-400' onClick={onCancel}>Cancel</Button>
           </div>
         </form>
       </MyModal>
@@ -175,24 +214,28 @@ function App() {
           {renderEditProduct('descrption', 'Product Descrption', 'descrption')}
           {renderEditProduct('imageURL', 'Product Image URL', 'imageURL')}
           {renderEditProduct('price', 'Product Price', 'price')}
-
-          {/* {formInput}
-          <SelectMenu selected={selectedCategory} setSelected={setSelectedCategory} /> */}
-          
+          <SelectMenu selected={editProduct.category} setSelected={value => setEditProduct({ ...editProduct, category: value })} />
           <div className='flex items-center space-x-1'>
             {renderColorPro}
           </div>
           <div className='flex items-center flex-wrap space-x-1'>
-            {tempColor.map(color => (
+            {tempColor.concat(editProduct.colors).map(color => (
               <span key={color} style={{ backgroundColor: color }} className='px-1 rounded-md text-white'>{color}</span>
             ))}
           </div>
-
           <div className='flex flex-row gap-x-3 w-full'>
-            <Button className='bg-indigo-500 text-[20px] font-semibold transition duration-300 hover:bg-indigo-800'>Submit</Button>
-            <Button className='bg-white text-[20px] font-semibold' onClick={onCancel}>Cancel</Button>
+            <Button className='bg-indigo-500 transition duration-300 hover:bg-indigo-800'>Submit</Button>
+            <Button className='bg-white' onClick={onCancel}>Cancel</Button>
           </div>
         </form>
+      </MyModal>
+
+      {/* Delete Product */}
+      <MyModal isOpen={isOpenRemove} close={close} title='Remove form'>
+        <div className='flex flex-row gap-x-3 w-full'>
+          <Button onClick={removeProduct} className="bg-[#ff4d4f] hover:bg-[#ff7875]">Yes, Remove</Button>
+          <Button onClick={closeRemoveForm} className='bg-gray-500 hover:bg-gray-400'>Cancel</Button>
+        </div>
       </MyModal>
     </main>
   )
